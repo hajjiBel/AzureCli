@@ -1,96 +1,139 @@
 # Lab 13 - Déployer un Cluster AKS avec Azure CLI
 
-## Vue d'overview
+## Vue d'ensemble
 
-Ce lab vous guide à travers le déploiement d'un cluster Azure Kubernetes Service (AKS) en utilisant l'Azure CLI, puis le déploiement d'une application multi-conteneurs. Vous apprendrez les concepts essentiels de l'orchestration de conteneurs.
+Ce lab vous guide à travers le déploiement d'un cluster Azure Kubernetes Service (AKS) en utilisant l'Azure CLI, puis le déploiement d'une application multi-conteneurs. Vous apprendrez les concepts essentiels de l'orchestration de conteneurs avec Kubernetes.
 
 ---
 
-## Objectifs Pédagogiques
+## Objectifs pédagogiques
 
 À l'issue de ce lab, vous serez capable de :
 
-- **Comprendre Kubernetes et AKS** : Concepts de l'orchestration
-- **Créer un cluster AKS** : Déployer un cluster Kubernetes géré
-- **Se connecter au cluster** : Utiliser kubectl pour gérer
-- **Déployer une application** : Lancer une app multi-tier
-- **Exposer l'application** : Créer des services Kubernetes
-- **Monitorer l'application** : Consulter logs et métriques
+- **Comprendre Kubernetes et AKS** : Concepts de l'orchestration de conteneurs
+- **Créer un cluster AKS** : Déployer un cluster Kubernetes géré par Azure
+- **Se connecter au cluster** : Utiliser kubectl pour gérer les ressources
+- **Déployer une application** : Lancer une app multi-tier (frontend + redis backend)
+- **Exposer l'application** : Créer des services Kubernetes LoadBalancer
+- **Monitorer l'application** : Consulter logs, métriques et événements
 - **Gérer les ressources** : Vérifier nœuds, pods et services
+- **Scaler l'application** : Augmenter/diminuer les réplicas
 
 ---
-
 
 ## Prérequis
 
-- Azure CLI version 2.0.55+ installé
+- Azure CLI 2.0.55+ installé
 - Compte Azure actif
-- kubectl installé localement
-- Accès à Azure Cloud Shell (recommandé)
-- Compréhension basique de Kubernetes
+- kubectl installé localement (ou utilisé via Cloud Shell)
+- Accès à Azure Cloud Shell (recommandé : https://shell.azure.com)
+- Compréhension basique des concepts Kubernetes (pods, services, déploiements)
+- Environ 15-20 minutes pour la création du cluster
+
+### Permissions requises
+
+- **Kubernetes Service Contributor** : Pour créer/gérer les clusters AKS
+- **Virtual Machine Contributor** : Pour les nœuds worker
+- Accès administrateur pour récupérer les credentials
 
 ---
 
-## Architecture et Ressources
+## Architecture et ressources
 
 ```
-┌─────────────────────────────────────┐
-│       Azure Subscription            │
-│   ┌────────────────────────────┐   │
-│   │ Groupe de Ressources       │   │
-│   │ myAKSCluster               │   │
-│   │ (Région: eastus)           │   │
-│   │                            │   │
-│   │  ┌──────────────────────┐ │   │
-│   │  │ AKS Cluster          │ │   │
-│   │  │ myAKSCluster         │ │   │
-│   │  │                      │ │   │
-│   │  │ ┌──────────────────┐│ │   │
-│   │  │ │ Node 1 (Linux)   ││ │   │
-│   │  │ │ ┌─ azure-vote   ││ │   │
-│   │  │ │ └─ front pods    ││ │   │
-│   │  │ └──────────────────┘│ │   │
-│   │  │                      │ │   │
-│   │  │ ┌──────────────────┐│ │   │
-│   │  │ │ Node 2+ (opt.)   ││ │   │
-│   │  │ │ ┌─ azure-vote   ││ │   │
-│   │  │ │ └─ back pods     ││ │   │
-│   │  │ └──────────────────┘│ │   │
-│   │  └──────────────────────┘ │   │
-│   │                            │   │
-│   │ Services Kubernetes:       │   │
-│   │ • LoadBalancer (Frontend)  │   │
-│   │ • ClusterIP (Backend)      │   │
-│   │                            │   │
-│   │ Monitoring:                │   │
-│   │ • Container Insights       │   │
-│   └────────────────────────────┘   │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│       Azure Subscription                            │
+│   ┌──────────────────────────────────────────┐     │
+│   │ Groupe de Ressources : myAKSCluster      │     │
+│   │ (Région: eastus)                         │     │
+│   │                                          │     │
+│   │  ┌──────────────────────────────────┐   │     │
+│   │  │ AKS Cluster : myAKSCluster       │   │     │
+│   │  │                                  │   │     │
+│   │  │ Control Plane (Géré par Azure)   │   │     │
+│   │  │ • Kubernetes API Server          │   │     │
+│   │  │ • Scheduler                      │   │     │
+│   │  │ • Controller Manager             │   │     │
+│   │  │                                  │   │     │
+│   │  │ ┌──────────────────────────────┐ │   │     │
+│   │  │ │ Node Pool (Linux)            │ │   │     │
+│   │  │ │                              │ │   │     │
+│   │  │ │ ┌────────────────────────┐   │ │   │     │
+│   │  │ │ │ Node 1 (VM)            │   │ │   │     │
+│   │  │ │ │ • azure-vote-front pod │   │ │   │     │
+│   │  │ │ │ • redis pod (backup)   │   │ │   │     │
+│   │  │ │ └────────────────────────┘   │ │   │     │
+│   │  │ │                              │ │   │     │
+│   │  │ │ (Additional nodes optionnel) │ │   │     │
+│   │  │ └──────────────────────────────┘ │   │     │
+│   │  │                                  │   │     │
+│   │  │ Services Kubernetes :            │   │     │
+│   │  │ • LoadBalancer (Frontend - IP)   │   │     │
+│   │  │ • ClusterIP (Backend - interne)  │   │     │
+│   │  │                                  │   │     │
+│   │  │ Monitoring & Logging :           │   │     │
+│   │  │ • Container Insights (optional)  │   │     │
+│   │  │ • kubectl logs & describe        │   │     │
+│   │  └──────────────────────────────────┘   │     │
+│   │                                          │     │
+│   └──────────────────────────────────────────┘     │
+│                                                     │
+│  Données :                                          │
+│  • VM credentials : ~/.kube/config                 │
+│  • App data : Redis en mémoire                     │
+│  • Persistent Storage : Non utilisé pour ce lab    │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Étapes de Réalisation
+## Étapes de réalisation
 
-### Tâche 1 : Ouvrir Azure CLI
+### Tâche 1 : Accéder à Azure CLI
 
-1. Allez à https://shell.azure.com (Cloud Shell) - **Recommandé**
-2. Ou ouvrez votre terminal local et tapez: `az login`
-3. Authentifiez-vous avec votre compte Azure
+1. **Option A : Cloud Shell (Recommandé)**
+   - Allez à <https://shell.azure.com>
+   - Sélectionnez **Bash**
+   - Vous êtes automatiquement authentifiés
+
+2. **Option B : Terminal local**
+   - Ouvrez votre terminal (PowerShell, Bash, ou Command Prompt)
+   - Exécutez :
+
+   ```bash
+   az login
+   ```
+
+   - Suivez les instructions pour vous authentifier
 
 ---
 
-### Tâche 2 : Créer un Groupe de Ressources
+### Tâche 2 : Vérifier la version d'Azure CLI
 
-1. Exécutez:
+1. Exécutez :
+
+   ```bash
+   az --version
+   ```
+
+2. Vérifiez que la version est **2.0.55+** (généralement 2.x.x)
+
+---
+
+### Tâche 3 : Créer un groupe de ressources
+
+1. Exécutez :
+
    ```bash
    az group create --name myAKSCluster --location eastus
    ```
 
-2. Résultat:
+2. Résultat attendu :
+
    ```json
    {
      "id": "/subscriptions/.../myAKSCluster",
+     "location": "eastus",
      "name": "myAKSCluster",
      "properties": {
        "provisioningState": "Succeeded"
@@ -100,11 +143,12 @@ Ce lab vous guide à travers le déploiement d'un cluster Azure Kubernetes Servi
 
 ---
 
-### Tâche 3 : Créer le Cluster AKS
+### Tâche 4 : Créer le cluster AKS
 
-⚠️ **Cette étape peut prendre 5-10 minutes, soyez patient!**
+⚠️ **IMPORTANT** : Cette étape peut prendre **5-10 minutes**. Soyez patient !
 
-1. Exécutez:
+1. Exécutez :
+
    ```bash
    az aks create \
      --resource-group myAKSCluster \
@@ -114,60 +158,87 @@ Ce lab vous guide à travers le déploiement d'un cluster Azure Kubernetes Servi
      --generate-ssh-keys
    ```
 
-2. Cette commande crée:
-   - Cluster Kubernetes avec **1 nœud**
-   - **Monitoring** activé (Container Insights)
-   - **Clés SSH** générées
+2. Cette commande crée :
+   - Cluster Kubernetes avec **1 nœud Linux**
+   - **Monitoring** activé (Container Insights optionnel)
+   - **Clés SSH** générées automatiquement
 
-3. Attendez que le déploiement soit terminé (5-10 minutes)
+3. ⏳ **Attendez 5-10 minutes** que le déploiement soit terminé
 
-4. Vous verrez un JSON volumineux avec les détails
+4. À la fin, vous verrez une sortie JSON volumineux contenant :
+   - `provisioningState: "Succeeded"`
+   - `fqdn` du cluster
+   - `kubeConfig` encodée
+
+> **Que se passe-t-il pendant ce temps ?**
+> - Azure crée la VM pour le nœud worker
+> - Installe les composants Kubernetes
+> - Configure le réseau et le stockage
+> - Configure les identités gérées
 
 ---
 
-### Tâche 4 : Configurer kubectl
+### Tâche 5 : Configurer kubectl
 
-1. Téléchargez les credentials:
+1. Téléchargez les credentials du cluster :
+
    ```bash
    az aks get-credentials --resource-group myAKSCluster --name myAKSCluster
    ```
 
-2. Vérifiez que kubectl est configuré:
+2. Vous verrez :
+
+   ```
+   Merged "myAKSCluster" as current context in /home/<user>/.kube/config
+   ```
+
+   Cela crée/met à jour le fichier de configuration kubeconfig local.
+
+3. Vérifiez que kubectl est configuré :
+
    ```bash
    kubectl cluster-info
    ```
 
-3. Résultat:
+4. Résultat attendu :
+
    ```
-   Kubernetes control plane is running at https://myakscluster-xxxx.hcp.eastus.azmk8s.io:443
+   Kubernetes control plane is running at https://myakscluster-xxxxx.hcp.eastus.azmk8s.io:443
+   CoreDNS is running at https://myakscluster-xxxxx.hcp.eastus.azmk8s.io:443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
    ```
 
 ---
 
-### Tâche 5 : Vérifier les Nœuds
+### Tâche 6 : Vérifier les nœuds
 
-1. Listez les nœuds:
+1. Listez les nœuds du cluster :
+
    ```bash
    kubectl get nodes
    ```
 
-2. Résultat:
+2. Résultat attendu :
+
    ```
    NAME                        STATUS   ROLES   AGE   VERSION
    aks-nodepool1-12345678-0    Ready    agent   2m    v1.29.2
    ```
 
+   > Le statut doit être **Ready**
+
 ---
 
-### Tâche 6 : Créer le Fichier YAML de Déploiement
+### Tâche 7 : Créer le fichier manifeste Kubernetes
 
-1. Créez un fichier `azure-vote.yaml`:
+1. Créez un fichier nommé `azure-vote.yaml` :
+
    ```bash
    cat > azure-vote.yaml << 'EOF'
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: azure-vote-back
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -182,7 +253,7 @@ spec:
         "beta.kubernetes.io/os": linux
       containers:
       - name: azure-vote-back
-        image: redis
+        image: redis:6.0
         resources:
           requests:
             cpu: 100m
@@ -198,6 +269,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: azure-vote-back
+  namespace: default
 spec:
   ports:
   - port: 6379
@@ -208,6 +280,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: azure-vote-front
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -222,7 +295,7 @@ spec:
         "beta.kubernetes.io/os": linux
       containers:
       - name: azure-vote-front
-        image: microsoft/azure-vote-front:v1
+        image: mcr.microsoft.com/azuredocs/azure-vote-front:v1
         resources:
           requests:
             cpu: 100m
@@ -240,25 +313,36 @@ apiVersion: v1
 kind: Service
 metadata:
   name: azure-vote-front
+  namespace: default
 spec:
   type: LoadBalancer
   ports:
   - port: 80
+    targetPort: 80
   selector:
     app: azure-vote-front
 EOF
    ```
 
+   **Points importants** :
+   - **Backend** : `redis:6.0` (image Docker Hub valide)
+   - **Frontend** : `mcr.microsoft.com/azuredocs/azure-vote-front:v1` (Microsoft Container Registry - image validée)
+   - **Service Frontend** : Type `LoadBalancer` (crée une IP publique)
+   - **Service Backend** : Type `ClusterIP` (interne seulement)
+   - **Variable d'environnement** : `REDIS: "azure-vote-back"` (nom du service backend)
+
 ---
 
-### Tâche 7 : Déployer l'Application
+### Tâche 8 : Déployer l'application
 
-1. Déployez:
+1. Appliquez le manifeste :
+
    ```bash
    kubectl apply -f azure-vote.yaml
    ```
 
-2. Résultat:
+2. Résultat attendu :
+
    ```
    deployment.apps/azure-vote-back created
    service/azure-vote-back created
@@ -266,168 +350,331 @@ EOF
    service/azure-vote-front created
    ```
 
+   ⏳ Les pods peuvent prendre **1-2 minutes** pour démarrer.
+
 ---
 
-### Tâche 8 : Vérifier les Déploiements
+### Tâche 9 : Vérifier les déploiements
 
-1. Listez:
+1. Listez les déploiements :
+
    ```bash
    kubectl get deployments
    ```
 
-2. Résultat:
+2. Résultat attendu :
+
    ```
    NAME                 READY   UP-TO-DATE   AVAILABLE   AGE
-   azure-vote-back      1/1     1            1           30s
-   azure-vote-front     1/1     1            1           30s
+   azure-vote-back      1/1     1            1           45s
+   azure-vote-front     1/1     1            1           45s
    ```
+
+   > **READY 1/1** signifie que le pod est lancé et prêt
 
 ---
 
-### Tâche 9 : Vérifier les Pods
+### Tâche 10 : Vérifier les pods
 
-1. Listez:
+1. Listez tous les pods :
+
    ```bash
    kubectl get pods
    ```
 
-2. Résultat:
+2. Résultat attendu :
+
    ```
    NAME                                 READY   STATUS    RESTARTS   AGE
-   azure-vote-back-xxxxx                1/1     Running   0          45s
-   azure-vote-front-xxxxx               1/1     Running   0          45s
+   azure-vote-back-xxxxxxxx-xxxxx       1/1     Running   0          60s
+   azure-vote-front-xxxxxxxx-xxxxx      1/1     Running   0          60s
    ```
+
+   > **STATUS: Running** = Pod démarré avec succès
+
+3. **Si STATUS = Pending ou ImagePullBackOff** : Attendez 30-60 secondes supplémentaires
 
 ---
 
-### Tâche 10 : Monitorer l'IP Publique
+### Tâche 11 : Obtenir l'adresse IP publique
 
-1. Attendez que l'IP soit attribuée:
+1. Attendez que l'IP soit attribuée (peut prendre 2-3 minutes) :
+
    ```bash
    kubectl get service azure-vote-front --watch
    ```
 
-2. Initialement: `EXTERNAL-IP` est `<pending>`
+2. Résultat attendu :
 
-3. Après quelques minutes: Une IP publique apparaît
+   ```
+   NAME               TYPE           CLUSTER-IP     EXTERNAL-IP    PORT(S)        AGE
+   azure-vote-front   LoadBalancer   10.0.1.xxx     52.179.23.131  80:32xxx/TCP   2m
+   ```
 
-4. **Appuyez sur Ctrl+C** pour arrêter
+   - Initialement : `EXTERNAL-IP` = `<pending>`
+   - Après quelques minutes : Une **IP publique** apparaît
+
+3. **Appuyez sur Ctrl+C** pour arrêter le watch
 
 ---
 
-### Tâche 11 : Accéder à l'Application
+### Tâche 12 : Accéder à l'application
 
-1. Copiez l'EXTERNAL-IP
+1. Copiez la valeur de **EXTERNAL-IP** (ex: `52.179.23.131`)
 2. Ouvrez un navigateur
-3. Allez à: http://52.179.23.131
+3. Allez à : `http://<EXTERNAL-IP>` (ex: http://52.179.23.131)
 4. Vous verrez l'application **Azure Vote App**
-5. Cliquez pour voter
+5. Testez : Cliquez sur les boutons pour voter
 
 ---
 
-### Tâche 12 : Consulter les Logs
+### Tâche 13 : Consulter les logs des pods
 
-1. Obtenez les pods:
+1. Listez les noms de pods :
+
    ```bash
    kubectl get pods
    ```
 
-2. Consultez les logs:
+2. Consultez les logs du frontend :
+
    ```bash
-   kubectl logs <pod-name>
+   kubectl logs <nom-du-pod-frontend>
+   ```
+
+   Exemple :
+
+   ```bash
+   kubectl logs azure-vote-front-xxxxxxxx-xxxxx
+   ```
+
+3. Consultez les logs du backend :
+
+   ```bash
+   kubectl logs <nom-du-pod-backend>
+   ```
+
+4. Vous verrez des lignes comme :
+
+   ```
+   [1] 18 Nov 2024 12:34:56.789 * The server is now ready to accept connections on port 6379
    ```
 
 ---
 
-### Tâche 13 : Décrire un Pod
+### Tâche 14 : Décrire un pod (pour le dépannage)
 
-1. Exécutez:
+1. Exécutez :
+
    ```bash
-   kubectl describe pod <pod-name>
+   kubectl describe pod <nom-du-pod>
    ```
 
-2. Vous verrez les détails complets
+2. Vous verrez des informations détaillées :
+   - Labels
+   - Containers
+   - State
+   - **Events** (très utile pour le dépannage)
+
+3. Regardez la section **Events** pour les erreurs
 
 ---
 
-### Tâche 14 : Scaling (Optionnel)
+### Tâche 15 : Scaler l'application (Augmenter les réplicas)
 
-1. Augmentez les réplicas:
+1. Augmentez les réplicas du frontend à 3 :
+
    ```bash
    kubectl scale deployment azure-vote-front --replicas=3
    ```
 
-2. Vérifiez:
+2. Vérifiez :
+
    ```bash
    kubectl get pods
    ```
 
-3. Vous verrez **3 pods** en cours d'exécution
+3. Résultat : Vous verrez **3 pods** du frontend en cours d'exécution
+
+4. Réduisez à 1 replica :
+
+   ```bash
+   kubectl scale deployment azure-vote-front --replicas=1
+   ```
 
 ---
 
-### Tâche 15 : Nettoyer les Ressources
+### Tâche 16 : Afficher les services
 
-1. Supprimez l'application:
+1. Listez tous les services :
+
+   ```bash
+   kubectl get services
+   ```
+
+2. Résultat :
+
+   ```
+   NAME               TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)        AGE
+   kubernetes         ClusterIP      10.0.0.1       <none>           443/TCP        15m
+   azure-vote-back    ClusterIP      10.0.1.xxx     <none>           6379/TCP       10m
+   azure-vote-front   LoadBalancer   10.0.1.yyy     52.179.23.131    80:32xxx/TCP   10m
+   ```
+
+   > **ClusterIP** = Interne seulement  
+   > **LoadBalancer** = IP publique
+
+---
+
+### Tâche 17 : Nettoyer l'application
+
+1. Supprimez l'application :
+
    ```bash
    kubectl delete -f azure-vote.yaml
    ```
 
-2. Supprimez le cluster (quelques minutes):
+2. Vérifiez que les pods ont disparu :
+
+   ```bash
+   kubectl get pods
+   ```
+
+   > Vous verrez le message : `No resources found in default namespace.`
+
+---
+
+### Tâche 18 : Supprimer le cluster AKS (Optionnel)
+
+⚠️ **ATTENTION** : Cette action supprime tout et génère des frais.
+
+1. Supprimez le cluster (quelques minutes) :
+
    ```bash
    az aks delete --resource-group myAKSCluster --name myAKSCluster --yes
    ```
 
-3. Supprimez le groupe de ressources:
+2. Supprimez le groupe de ressources entier :
+
    ```bash
    az group delete --name myAKSCluster --yes
    ```
 
 ---
 
-## Résumé des Apprentissages
+## Résumé des apprentissages
 
-| Concept | Description |
-|---------|-------------|
-| **Kubernetes** | Plateforme d'orchestration de conteneurs |
-| **AKS** | Service Kubernetes géré par Azure |
-| **Cluster** | Ensemble de nœuds exécutant des conteneurs |
-| **Nœud** | Machine (VM) dans le cluster |
-| **Pod** | Plus petite unité Kubernetes |
-| **Déploiement** | Gère les pods |
-| **Service** | Expose les pods |
-| **LoadBalancer** | Crée une IP publique |
-| **kubectl** | Outil CLI pour Kubernetes |
-
----
-
-## Questions de Révision
-
-1. Quelle est la différence entre un nœud et un pod?
-2. Pourquoi utiliser Kubernetes?
-3. Quel est le rôle d'un Service LoadBalancer?
-4. Comment afficher les logs?
-5. Comment scaler les pods?
+| Concept | Description | Exemple |
+|---------|-------------|---------|
+| **Kubernetes** | Plateforme d'orchestration de conteneurs | Gère le cycle de vie des pods |
+| **AKS** | Service Kubernetes géré par Azure | Gère le control plane automatiquement |
+| **Cluster** | Ensemble de nœuds exécutant Kubernetes | `myAKSCluster` |
+| **Nœud** | Machine virtuelle Linux/Windows | `aks-nodepool1-12345678-0` |
+| **Pod** | Plus petite unité Kubernetes déployable | `azure-vote-front-xxxxx` |
+| **Déploiement** | Gère les pods et leurs réplicas | `azure-vote-back`, `azure-vote-front` |
+| **Service** | Expose les pods au réseau | `LoadBalancer`, `ClusterIP` |
+| **LoadBalancer** | Crée une IP publique Azure | `azure-vote-front` (IP: 52.179.23.131) |
+| **ClusterIP** | Service interne (default) | `azure-vote-back` (interne seulement) |
+| **kubectl** | CLI pour Kubernetes | Commandes: apply, get, logs, scale |
+| **Image Docker** | Template pour les conteneurs | `redis:6.0`, `mcr.microsoft.com/azuredocs/azure-vote-front:v1` |
+| **Replica** | Nombre de copies d'un pod | Scaling de 1 à 3 pods |
 
 ---
 
-## Dépannage Courant
+## Questions de révision
 
-| Problème | Solution |
-|---------|----------|
-| **Déploiement lent** | C'est normal, attendez 10 minutes |
-| **Pod en Pending** | Vérifiez les ressources disponibles |
-| **IP publique ne s'affiche pas** | Attendez quelques minutes |
-| **Application inaccessible** | Vérifiez l'IP et le port 80 |
+1. **Quelle est la différence entre un nœud et un pod ?**
+   - Un **nœud** est une VM qui exécute le runtime Kubernetes
+   - Un **pod** est le conteneur (application) qui s'exécute sur le nœud
+
+2. **Pourquoi utiliser Kubernetes ?**
+   - Orchestration automatique des conteneurs
+   - Scaling automatique
+   - Gestion de la disponibilité
+   - Mises à jour sans temps d'arrêt
+
+3. **Quel est le rôle d'un Service LoadBalancer ?**
+   - Crée une adresse IP publique Azure
+   - Route le trafic vers les pods
+   - Assure la répartition de charge
+
+4. **Comment afficher les logs ?**
+   - `kubectl logs <nom-pod>`
+
+5. **Comment scaler les pods ?**
+   - `kubectl scale deployment <nom> --replicas=<nombre>`
 
 ---
 
-## Ressources Supplémentaires
+## Dépannage courant
 
-- [AKS Documentation](https://learn.microsoft.com/fr-fr/azure/aks/)
-- [Kubernetes Documentation](https://kubernetes.io/docs/home/)
-- [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)
+| Problème | Cause possible | Solution |
+|----------|----------------|----------|
+| **Déploiement lent** | C'est normal, création des nœuds | Attendez 5-10 minutes |
+| **Pod en Pending** | Image en cours de téléchargement ou ressources insuffisantes | Attendez 30-60 secondes ou vérifiez `kubectl describe pod` |
+| **ImagePullBackOff** | Image Docker introuvable ou invalide | Vérifiez le nom de l'image (doit être `mcr.microsoft.com/azuredocs/azure-vote-front:v1`) |
+| **IP publique ne s'affiche pas** | Allocation en cours | Attendez 2-3 minutes |
+| **Application inaccessible** | Port, NSG, ou routage bloqué | Vérifiez l'IP avec `kubectl get svc` et testez `curl http://<IP>:80` |
+| **Erreur de permissions** | Utilisateur non autorisé | Vérifiez le rôle RBAC (Kubernetes Service Contributor) |
+| **Cluster ne se crée pas** | Quota Azure dépassé ou région invalide | Vérifiez les quotas Azure et la région disponible |
+
+### Commandes utiles pour le dépannage
+
+```bash
+# Détails complets d'un pod
+kubectl describe pod <nom-pod>
+
+# Logs en continu
+kubectl logs -f <nom-pod>
+
+# Logs des 10 dernières minutes
+kubectl logs --since=10m <nom-pod>
+
+# Événements du cluster
+kubectl get events
+
+# État détaillé du cluster
+kubectl cluster-info dump
+
+# Accès shell au conteneur (si bash disponible)
+kubectl exec -it <nom-pod> -- /bin/bash
+```
 
 ---
 
-**Dernière mise à jour**: Décembre 2025
+## Notes importantes
+
+✅ **Bonnes pratiques** :
+- Utilisez les **ressources limites** (limits, requests) dans les manifestes
+- Testez dans un cluster de développement avant la production
+- Utilisez les **namespaces** pour isoler les applications
+- Mettez en place **Container Insights** pour le monitoring en production
+- Sauvegardez vos manifestes YAML dans Git
+
+❌ **Erreurs à éviter** :
+- Ne pas utiliser `latest` comme tag d'image (toujours spécifiez une version)
+- Ne pas utiliser l'image obsolète `microsoft/azure-vote-front:v1` (utiliser `mcr.microsoft.com/azuredocs/azure-vote-front:v1`)
+- Ne pas oublier les **resource limits** (risque de Pending pods)
+- Ne pas supprimer directement les pods (utiliser `kubectl delete deployment`)
+
+⚠️ **Coûts** :
+- Cluster AKS (1 nœud) : ~0,10 € par heure
+- Stockage : Environ 0,10 € par mois
+- Coûts réseau : Faibles pour ce lab (données locales)
+- **Total estimé pour ce lab (1-2 heures) : 0,20-0,30 €**
+
+---
+
+## Ressources supplémentaires
+
+- [Documentation AKS officielle](https://learn.microsoft.com/fr-fr/azure/aks/)
+- [Documentation Kubernetes](https://kubernetes.io/docs/home/)
+- [Cheat Sheet kubectl](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)
+- [Azure Docs - Déployer AKS](https://learn.microsoft.com/fr-fr/azure/aks/kubernetes-walkthrough)
+- [Microsoft Container Registry (MCR)](https://mcr.microsoft.com)
+
+---
+
+**Version** : 2.0 (Décembre 2025)  
+**Statut** : ✅ Testé et validé (Images corrigées)  
+**Durée estimée** : 30-45 minutes (sans suppression du cluster)
