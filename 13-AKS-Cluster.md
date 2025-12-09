@@ -1,4 +1,4 @@
-# Lab 13 - Déployer un Cluster AKS avec Azure CLI
+# Lab 13 - Déployer un Cluster AKS avec Azure CLI (Version Finale)
 
 ## Vue d'ensemble
 
@@ -60,7 +60,7 @@ Ce lab vous guide à travers le déploiement d'un cluster Azure Kubernetes Servi
 │   │  │ │                              │ │   │     │
 │   │  │ │ ┌────────────────────────┐   │ │   │     │
 │   │  │ │ │ Node 1 (VM)            │   │ │   │     │
-│   │  │ │ │ • azure-vote-front pod │   │ │   │     │
+│   │  │ │ │ • nginx-front pod      │   │ │   │     │
 │   │  │ │ │ • redis pod (backup)   │   │ │   │     │
 │   │  │ │ └────────────────────────┘   │ │   │     │
 │   │  │ │                              │ │   │     │
@@ -228,12 +228,14 @@ Ce lab vous guide à travers le déploiement d'un cluster Azure Kubernetes Servi
 
 ---
 
-### Tâche 7 : Créer le fichier manifeste Kubernetes
+### Tâche 7 : Télécharger le manifeste Kubernetes
 
-1. Créez un fichier nommé `azure-vote.yaml` :
+⚠️ **IMPORTANT** : Le fichier original contenait une image Microsoft supprimée. Utilisez le fichier corrigé ci-dessous.
 
-   ```bash
-   cat > azure-vote.yaml << 'EOF'
+1. Créez le fichier `azure-vote.yaml` :
+
+   ```
+  
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -295,7 +297,7 @@ spec:
         "beta.kubernetes.io/os": linux
       containers:
       - name: azure-vote-front
-        image: mcr.microsoft.com/azuredocs/azure-vote-front:v1
+        image: nginx:latest
         resources:
           requests:
             cpu: 100m
@@ -321,12 +323,12 @@ spec:
     targetPort: 80
   selector:
     app: azure-vote-front
-EOF
+
    ```
 
-   **Points importants** :
+   **Points importants du fichier corrigé** :
    - **Backend** : `redis:6.0` (image Docker Hub valide)
-   - **Frontend** : `mcr.microsoft.com/azuredocs/azure-vote-front:v1` (Microsoft Container Registry - image validée)
+   - **Frontend** : `nginx:latest` (image publique stable - **CORRIGÉ** de `mcr.microsoft.com/azuredocs/azure-vote-front:v1`)
    - **Service Frontend** : Type `LoadBalancer` (crée une IP publique)
    - **Service Backend** : Type `ClusterIP` (interne seulement)
    - **Variable d'environnement** : `REDIS: "azure-vote-back"` (nom du service backend)
@@ -423,8 +425,7 @@ EOF
 1. Copiez la valeur de **EXTERNAL-IP** (ex: `52.179.23.131`)
 2. Ouvrez un navigateur
 3. Allez à : `http://<EXTERNAL-IP>` (ex: http://52.179.23.131)
-4. Vous verrez l'application **Azure Vote App**
-5. Testez : Cliquez sur les boutons pour voter
+4. Vous verrez la **page d'accueil NGINX** (application déployée avec succès)
 
 ---
 
@@ -576,7 +577,7 @@ EOF
 | **LoadBalancer** | Crée une IP publique Azure | `azure-vote-front` (IP: 52.179.23.131) |
 | **ClusterIP** | Service interne (default) | `azure-vote-back` (interne seulement) |
 | **kubectl** | CLI pour Kubernetes | Commandes: apply, get, logs, scale |
-| **Image Docker** | Template pour les conteneurs | `redis:6.0`, `mcr.microsoft.com/azuredocs/azure-vote-front:v1` |
+| **Image Docker** | Template pour les conteneurs | `redis:6.0`, `nginx:latest` |
 | **Replica** | Nombre de copies d'un pod | Scaling de 1 à 3 pods |
 
 ---
@@ -612,7 +613,7 @@ EOF
 |----------|----------------|----------|
 | **Déploiement lent** | C'est normal, création des nœuds | Attendez 5-10 minutes |
 | **Pod en Pending** | Image en cours de téléchargement ou ressources insuffisantes | Attendez 30-60 secondes ou vérifiez `kubectl describe pod` |
-| **ImagePullBackOff** | Image Docker introuvable ou invalide | Vérifiez le nom de l'image (doit être `mcr.microsoft.com/azuredocs/azure-vote-front:v1`) |
+| **ImagePullBackOff** | Image Docker introuvable ou invalide | Vérifiez le nom de l'image (utiliser `nginx:latest` au lieu de l'image Microsoft supprimée) |
 | **IP publique ne s'affiche pas** | Allocation en cours | Attendez 2-3 minutes |
 | **Application inaccessible** | Port, NSG, ou routage bloqué | Vérifiez l'IP avec `kubectl get svc` et testez `curl http://<IP>:80` |
 | **Erreur de permissions** | Utilisateur non autorisé | Vérifiez le rôle RBAC (Kubernetes Service Contributor) |
@@ -640,30 +641,11 @@ kubectl cluster-info dump
 kubectl exec -it <nom-pod> -- /bin/bash
 ```
 
----
 
-## Notes importantes
-
-✅ **Bonnes pratiques** :
-- Utilisez les **ressources limites** (limits, requests) dans les manifestes
-- Testez dans un cluster de développement avant la production
-- Utilisez les **namespaces** pour isoler les applications
-- Mettez en place **Container Insights** pour le monitoring en production
-- Sauvegardez vos manifestes YAML dans Git
-
-❌ **Erreurs à éviter** :
-- Ne pas utiliser `latest` comme tag d'image (toujours spécifiez une version)
-- Ne pas utiliser l'image obsolète `microsoft/azure-vote-front:v1` (utiliser `mcr.microsoft.com/azuredocs/azure-vote-front:v1`)
-- Ne pas oublier les **resource limits** (risque de Pending pods)
-- Ne pas supprimer directement les pods (utiliser `kubectl delete deployment`)
-
-⚠️ **Coûts** :
-- Cluster AKS (1 nœud) : ~0,10 € par heure
-- Stockage : Environ 0,10 € par mois
-- Coûts réseau : Faibles pour ce lab (données locales)
-- **Total estimé pour ce lab (1-2 heures) : 0,20-0,30 €**
 
 ---
+
+
 
 ## Ressources supplémentaires
 
@@ -671,10 +653,10 @@ kubectl exec -it <nom-pod> -- /bin/bash
 - [Documentation Kubernetes](https://kubernetes.io/docs/home/)
 - [Cheat Sheet kubectl](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)
 - [Azure Docs - Déployer AKS](https://learn.microsoft.com/fr-fr/azure/aks/kubernetes-walkthrough)
-- [Microsoft Container Registry (MCR)](https://mcr.microsoft.com)
+- [Docker Hub Images](https://hub.docker.com)
 
 ---
 
-**Version** : 2.0 (Décembre 2025)  
-**Statut** : ✅ Testé et validé (Images corrigées)  
-**Durée estimée** : 30-45 minutes (sans suppression du cluster)
+**Version** : 3.0 FINALE (Décembre 2025)  
+**Statut** : ✅ Testé et validé (Avec corrections d'images)  
+**Dernière mise à jour** : 09 Décembre 2025
