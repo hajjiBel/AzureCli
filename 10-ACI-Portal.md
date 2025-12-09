@@ -103,7 +103,8 @@ Ce lab vous guide à travers le déploiement d'un conteneur Docker sans serveur 
    - **Source d'image**: Docker Hub
    - **Image**: nginx
    - **Balise d'image**: latest
-
+   - **CPU**: 1
+   - **Mémoire (GB)**: 1
 ---
 
 ### Tâche 5 : Configurer le Réseau
@@ -117,16 +118,7 @@ Ce lab vous guide à travers le déploiement d'un conteneur Docker sans serveur 
 
 ---
 
-### Tâche 6 : Configurer les Ressources
-
-1. Entrez:
-   - **CPU**: 1
-   - **Mémoire (GB)**: 1
-2. Cliquez sur **"Examiner + créer"**
-
----
-
-### Tâche 7 : Créer le Conteneur
+### Tâche 6 : Créer le Conteneur
 
 1. Vérifiez les paramètres
 2. Cliquez sur **"Créer"**
@@ -134,7 +126,7 @@ Ce lab vous guide à travers le déploiement d'un conteneur Docker sans serveur 
 
 ---
 
-### Tâche 8 : Vérifier le Déploiement
+### Tâche 7 : Vérifier le Déploiement
 
 1. Allez à votre **groupe de ressources**
 2. Cliquez sur votre **conteneur**
@@ -142,7 +134,7 @@ Ce lab vous guide à travers le déploiement d'un conteneur Docker sans serveur 
 
 ---
 
-### Tâche 9 : Obtenir l'URL Publique
+### Tâche 8 : Obtenir l'URL Publique
 
 1. Dans les **Propriétés**
 2. Copier le **FQDN**: mycontainer.eastus.azurecontainerinstances.io
@@ -150,7 +142,7 @@ Ce lab vous guide à travers le déploiement d'un conteneur Docker sans serveur 
 
 ---
 
-### Tâche 10 : Accéder l'Application
+### Tâche 9 : Accéder l'Application
 
 1. Ouvrez un navigateur
 2. Allez à: http://mycontainer.eastus.azurecontainerinstances.io
@@ -158,7 +150,7 @@ Ce lab vous guide à travers le déploiement d'un conteneur Docker sans serveur 
 
 ---
 
-### Tâche 11 : Consulter les Logs
+### Tâche 10 : Consulter les Logs
 
 1. Retournez au conteneur dans le Portail
 2. Cliquez sur **"Logs"**
@@ -170,7 +162,7 @@ Ce lab vous guide à travers le déploiement d'un conteneur Docker sans serveur 
 
 ---
 
-### Tâche 12 : Vérifier les Propriétés
+### Tâche 11 : Vérifier les Propriétés
 
 1. Cliquez sur **"Propriétés"**
 2. Vérifiez:
@@ -181,8 +173,7 @@ Ce lab vous guide à travers le déploiement d'un conteneur Docker sans serveur 
 
 ---
 
-
-### Tâche 13 : Supprimer le Conteneur
+### Tâche 12 : Supprimer le Conteneur
 
 1. Cliquez sur **"Supprimer"**
 2. Confirmez: **Oui**
@@ -190,7 +181,7 @@ Ce lab vous guide à travers le déploiement d'un conteneur Docker sans serveur 
 
 ---
 
-### Tâche 14 : Nettoyer les Ressources
+### Tâche 13 : Nettoyer les Ressources
 
 1. Supprimez le **groupe de ressources**
 2. Allez à votre **groupe de ressources**
