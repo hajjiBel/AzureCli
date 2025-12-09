@@ -1,4 +1,4 @@
-# Lab 10 - Déployer un Conteneur ACI via le Portail Azure
+# Lab 2 - Déployer un Conteneur ACI via le Portail Azure
 
 ## Vue d'overview
 
