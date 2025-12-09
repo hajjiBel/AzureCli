@@ -15,7 +15,6 @@ Ce lab vous guide à travers le déploiement d'un cluster Azure Kubernetes Servi
 - **Se connecter au cluster** : Utiliser kubectl pour gérer les ressources
 - **Déployer une application** : Lancer une app multi-tier (frontend + redis backend)
 - **Exposer l'application** : Créer des services Kubernetes LoadBalancer
-- **Monitorer l'application** : Consulter logs, métriques et événements
 - **Gérer les ressources** : Vérifier nœuds, pods et services
 - **Scaler l'application** : Augmenter/diminuer les réplicas
 
