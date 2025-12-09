@@ -20,7 +20,6 @@ Ce lab vous guide à travers le déploiement automatisé d'un conteneur avec Azu
 
 ---
 
-
 ## Prérequis
 
 - Azure CLI 2.0.29+ installé
@@ -34,7 +33,7 @@ Ce lab vous guide à travers le déploiement automatisé d'un conteneur avec Azu
 
 ### Tâche 1 : Ouvrir Cloud Shell
 
-1. Allez à https://shell.azure.com
+1. Allez à [https://shell.azure.com](https://shell.azure.com)
 2. Sélectionnez **"Bash"**
 3. Ou utilisez votre terminal local avec `az login`
 
@@ -79,10 +78,53 @@ Ce lab vous guide à travers le déploiement automatisé d'un conteneur avec Azu
      --name mycontainer-cli \
      --image nginx \
      --dns-name-label mycontainer-cli \
-     --ports 80
+     --ports 80 \
+     --os-type Linux \
+     --cpu 1 \
+     --memory 1.5
    ```
 
 2. ⏳ Attendez 2-3 minutes
+
+#### Erreur fréquente : RegistryErrorResponse
+
+Si vous obtenez cette erreur :
+
+```
+RegistryErrorResponse
+An error response is received from the docker registry 'index.docker.io'
+```
+
+Cela signifie que Azure Container Instances n'a pas pu tirer l'image nginx depuis Docker Hub.
+
+👉 Ce n'est pas un problème dans ta commande.
+C'est un problème côté Docker Hub ou dans la connexion entre Azure ↔ Docker Hub.
+
+**Causes possibles**
+
+1. Pic de charge ou limite rate-limit de Docker Hub
+   - Docker Hub applique un rate limit :
+     - 100 pulls / 6h pour les utilisateurs anonymes
+     - 200 / 6h pour les utilisateurs authentifiés
+
+**Solution 1 — Ajouter authentification Docker Hub**
+
+Ainsi, ACI ne fera pas un pull anonyme.
+
+```bash
+az container create \
+  --resource-group myAciRG \
+  --name mycontainer-cli \
+  --image nginx \
+  --dns-name-label mycontainer-cli \
+  --ports 80 \
+  --os-type Linux \
+  --cpu 1 \
+  --memory 1.5 \
+  --registry-login-server index.docker.io \
+  --registry-username YOUR_DOCKER_USERNAME \
+  --registry-password YOUR_DOCKER_PASSWORD
+```
 
 ---
 
@@ -110,7 +152,7 @@ Ce lab vous guide à travers le déploiement automatisé d'un conteneur avec Azu
 
 1. Copiez le FQDN
 2. Ouvrez un navigateur
-3. Allez à: http://mycontainer-cli.eastus.azurecontainerinstances.io
+3. Allez à: [http://mycontainer-cli.eastus.azurecontainerinstances.io](http://mycontainer-cli.eastus.azurecontainerinstances.io)
 
 ---
 
@@ -212,7 +254,6 @@ Ce lab vous guide à travers le déploiement automatisé d'un conteneur avec Azu
 | **Automation** | Scripts pour déployer rapidement |
 
 ---
-
 
 ## Dépannage Courant
 
