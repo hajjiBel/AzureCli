@@ -234,8 +234,8 @@ Ce lab vous guide à travers le déploiement d'un cluster Azure Kubernetes Servi
 
 1. Créez le fichier `azure-vote.yaml` :
 
-   ```
-  
+
+```  
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -266,6 +266,8 @@ spec:
         ports:
         - containerPort: 6379
           name: redis
+```
+```
 ---
 apiVersion: v1
 kind: Service
@@ -277,6 +279,8 @@ spec:
   - port: 6379
   selector:
     app: azure-vote-back
+```
+```
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -310,6 +314,8 @@ spec:
         env:
         - name: REDIS
           value: "azure-vote-back"
+```
+```
 ---
 apiVersion: v1
 kind: Service
@@ -323,8 +329,8 @@ spec:
     targetPort: 80
   selector:
     app: azure-vote-front
-
-   ```
+```
+---
 
    **Points importants du fichier corrigé** :
    - **Backend** : `redis:6.0` (image Docker Hub valide)
